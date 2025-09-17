@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ranking de FIIs com Filtro</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .filters { margin-bottom: 20px; display: flex; gap: 15px; align-items: center; }
+        .filters label { font-weight: bold; }
+        .filters input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .filters button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .filters button:hover { background-color: #0056b3; }
+    </style>
+</head>
+<body>
+
+    <h1>Ranking de FIIs</h1>
+
+    <div class="filters">
+        <div>
+            <label for="min-liquidez">Liquidez Mínima:</label>
+            <input type="text" id="min-liquidez" placeholder="Ex: 500000">
+        </div>
+        <div>
+            <label for="min-dy">Dividend Yield Mínimo (%):</label>
+            <input type="text" id="min-dy" placeholder="Ex: 0.8">
+        </div>
+        <div>
+            <label for="min-pvp">P/VP Mínimo:</label>
+            <input type="text" id="min-pvp" placeholder="Ex: 0.9">
+        </div>
+        <button id="filter-button">Filtrar</button>
+    </div>
+
+    <table id="data-table">
+        <thead>
+            <tr>
+                <th>Papel</th>
+                <th>Segmento</th>
+                <th>Cotação</th>
+                <th>FFO Yield</th>
+                <th>Dividend Yield</th>
+                <th>P/VP</th>
+                <th>Valor de Mercado</th>
+                <th>Liquidez</th>
+                <th>Qtd de imóveis</th>
+                <th>Vacância Média</th>
+            </tr>
+        </thead>
+        <tbody id="data-output">
+        </tbody>
+    </table>
+
+    <script>
+        // Variável para armazenar todos os dados originais da API
+        let allFiis = [];
+        const tableBody = document.getElementById("data-output");
+        const filterButton = document.getElementById("filter-button");
+
+        // Função para converter strings formatadas (com R$, %, pontos e vírgulas) em números
+        function parseNumber(value) {
+            if (typeof value !== 'string') {
+                return value;
+            }
+            // Remove R$, espaços, % e pontos de milhar, e troca a vírgula decimal por ponto
+            return parseFloat(
+                value.replace("R$", "").trim().replace(/\./g, '').replace(",", ".").replace("%", "")
+            );
+        }
+
+        // Função para renderizar os dados na tabela
+        // Ela recebe um array de FIIs e os exibe
+        function renderTable(fiis) {
+            tableBody.innerHTML = ''; // Limpa a tabela antes de adicionar novas linhas
+            fiis.forEach(fii => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${fii.Papel}</td>
+                    <td>${fii.Segmento}</td>
+                    <td>${fii.Cotacao}</td>
+                    <td>${fii['FFO Yield']}</td>
+                    <td>${fii['Dividend Yield']}</td>
+                    <td>${fii['P/VP']}</td>
+                    <td>${fii['Valor de Mercado']}</td>
+                    <td>${fii.Liquidez}</td>
+                    <td>${fii['Qtd de imoveis']}</td>
+                    <td>${fii['Vacancia Media']}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        // Função para aplicar os filtros
+        function applyFilters() {
+            // Pega os valores dos inputs e os converte para número. Se o campo estiver vazio, considera 0.
+            const minLiquidez = parseNumber(document.getElementById("min-liquidez").value) || 0;
+            const minDY = parseNumber(document.getElementById("min-dy").value) || 0;
+            const minPVP = parseNumber(document.getElementById("min-pvp").value) || 0;
+
+            // Usa o método filter() no array original de FIIs
+            const filteredFiis = allFiis.filter(fii => {
+                const liquidez = parseNumber(fii.Liquidez);
+                const dividendYield = parseNumber(fii['Dividend Yield']);
+                const pvp = parseNumber(fii['P/VP']);
+
+                // Retorna true somente se o FII atender a todos os critérios
+                return liquidez >= minLiquidez && dividendYield >= minDY && pvp >= minPVP;
+            });
+
+            // Renderiza a tabela com os dados já filtrados
+            renderTable(filteredFiis);
+        }
+
+        // Busca os dados da API quando a página carrega
+        fetch('http://127.0.0.1:5000/fiis')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erro na requisição: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                allFiis = data; // Armazena os dados originais
+                renderTable(allFiis); // Renderiza a tabela com todos os dados inicialmente
+            })
+            .catch(error => {
+                console.error('Falha ao buscar dados na API', error);
+                tableBody.innerHTML = '<tr><td colspan="10">Não foi possível carregar os dados.</td></tr>';
+            });
+
+        // Adiciona o evento de clique ao botão para chamar a função de filtro
+        filterButton.addEventListener('click', applyFilters);
+
+    </script>
+</body>
+</html>
